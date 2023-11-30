@@ -25,7 +25,7 @@ import { Candidate, Election, Voter } from './model';
 
 @NearBindgen({})
 class VotingNear {
-  admins: string[]
+  admins: string[] = []
   electionsCounterId: number = 0
   elections: UnorderedMap<Election> = new UnorderedMap<Election>("elections")
   candidates: UnorderedMap<Candidate[]> = new UnorderedMap<Candidate[]>("candidates")
@@ -38,56 +38,120 @@ class VotingNear {
     near.log("Initializing contract...")
   }
 
+  @view({})
+  get_election({ electionId }: { electionId: number }): Election {
+    return this.elections.get(String(electionId))
+  }
+
+  @view({})
+  get_candidates_by_election({ electionId }: { electionId: number }): Candidate[] {
+    return this.candidates.get(String(electionId))
+  }
+
+  @view({})
+  get_voters_by_election({ electionId }: { electionId: number }): Voter[] {
+    return this.voters.get(String(electionId))
+  }
+
+  @view({})
+  get_voters_by_election_and_candidate({ electionId, candidateId }: { electionId: number, candidateId: string }): Voter[] {
+    const allVoters = this.voters.get(String(electionId))
+
+    const specificCandidateVoters = allVoters.filter((voter) => {
+      return voter.votedCandidateAccountId === candidateId
+    })
+
+    return specificCandidateVoters
+  }
+
   @call({})
-  create_election({ endsAt, id, name, startsAt }: Election): void {
-    const election = new Election({ startsAt, endsAt, name, id, candidates: [], totalVotes: 0, voters: [] })
-    this.elections.set(String(id), election)
+  create_election({ endsAt, name, startsAt }: Election): void {
+    const election = new Election(
+      { 
+        id: this.electionsCounterId,
+        startsAt: BigInt(Number(startsAt) * 10 ** 6), 
+        endsAt: BigInt(Number(endsAt) * 10 ** 6), 
+        name, 
+        candidates: [], 
+        voters: [],
+        totalVotes: 0 
+      }
+    )
+    this.elections.set(String(this.electionsCounterId), election)
+    this.electionsCounterId += 1
+
   }
 
   @call({})
   add_candidate_to_election({ accountId, electionId }: { accountId: string, electionId: number }): void {
+    // TO-DO verify if is valid near account id
     const electionToAddCandidate = this.elections.get(String(electionId))
     // TO-DO Verify if election exist
-    
+
     // TO-DO Verify if candidate already exists
     const candidate = new Candidate({ accountId, totalVotes: 0 })
+    near.log("candidate =>", candidate)
+
+    near.log("electionToAddCandidate.candidates =>", electionToAddCandidate.candidates)
     electionToAddCandidate.candidates.push(candidate)
     this.elections.set(String(electionId), electionToAddCandidate)
 
     const currentElectionCandidates = this.candidates.get(String(electionId))
-    currentElectionCandidates.push(candidate)
-    this.candidates.set(String(electionId), currentElectionCandidates)
+    near.log("currentElectionCandidates =>", currentElectionCandidates)
+
+    if (currentElectionCandidates === null) {
+      this.candidates.set(String(electionId), [candidate])
+    } else {
+      currentElectionCandidates.push(candidate)
+      this.candidates.set(String(electionId), currentElectionCandidates)
+    }
   }
 
   @call({})
   vote({ electionId, candidateId }: { electionId: number, candidateId: string }): void {
     const election = this.elections.get(String(electionId))
     // TO-DO Verify if election exists
+    // TO-DO Verify if election has started
+    // TO-DO Verify if election has already ended
 
     const alreadyVoted = election.voters.includes(near.signerAccountId())
+    near.log("election.voters", election.voters)
+
+    near.log("alreadyVoted", alreadyVoted)
     assert(!alreadyVoted, "User has already voted. Reverting call.")
 
     const candidates = this.candidates.get(String(electionId))
+
     const candidate = candidates.filter((candidateFilter) => {
       return candidateFilter.accountId === candidateId
     })[0]
+
     // TO-DO Verify if candidate exists
 
     const voter = new Voter({ accountId: near.signerAccountId(), votedCandidateAccountId: candidate.accountId, votedAt: near.blockTimestamp() })
   
-    // add voter to VOTERS in electionId
-    // incriment candidate totalVotes count
-    // incriment election totalVotes count
-    // add voter to election voters array
+
+    // TO-DO Verify why election voters are not being updated
+    // TO-DO Verify why election totalVotes are not being updated
+    // TO-DO Verify why election candidates totalVotes are not being updated
+
     election.voters.push(voter.accountId)
     election.totalVotes += 1
-    this.elections.set(String(election), election)
+    election.candidates.filter((candidateFilter) => {
+      return candidateFilter.accountId === candidate.accountId
+    })[0].totalVotes += 1
+    this.elections.set(String(electionId), election)
 
     candidate.totalVotes += 1
-    this.candidates.set(String(electionId), [...candidates, candidate])
+    this.candidates.set(String(electionId), candidates)
 
     const voters = this.voters.get(String(electionId))
-    voters.push(voter)
-    this.voters.set(String(electionId), [voter])
+    
+    if (voters === null) {
+      this.voters.set(String(electionId), [voter])
+    } else {
+      voters.push(voter)
+      this.voters.set(String(electionId), voters)
+    }
   }
 }
