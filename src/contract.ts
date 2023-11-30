@@ -21,6 +21,10 @@ import { Candidate, Election, Voter } from './model';
     - Get number of votes in election
     - Get number of votes by candidate
     - Get percentage competition between candidates
+
+  **IDEAS
+      near deploy --accountId your-account-id --wasmFile out/main.wasm --initFunction init --initArgs '{"admins": [""]}'
+    - Only admnins can add candidate
 */
 
 @NearBindgen({})
@@ -69,8 +73,8 @@ class VotingNear {
     const election = new Election(
       { 
         id: this.electionsCounterId,
-        startsAt: BigInt(Number(startsAt) * 10 ** 6), 
-        endsAt: BigInt(Number(endsAt) * 10 ** 6), 
+        startsAt: BigInt(Number(startsAt) * 10 ** 6), //Converting javascript milliseconds to near blockchain standard nanoseconds
+        endsAt: BigInt(Number(endsAt) * 10 ** 6), //Converting javascript milliseconds to near blockchain standard nanoseconds
         name, 
         candidates: [], 
         voters: [],
@@ -86,9 +90,16 @@ class VotingNear {
   add_candidate_to_election({ accountId, electionId }: { accountId: string, electionId: number }): void {
     // TO-DO verify if is valid near account id => https://nomicon.io/DataStructures/Account#account-id-rules
     const electionToAddCandidate = this.elections.get(String(electionId))
-    // TO-DO Verify if election exist
+    near.log("electionToAddCandidate", electionToAddCandidate)
+    const electionExists = this.verifyElectionExistence(electionId)
+    assert(electionExists, "Election not found.")
 
-    // TO-DO Verify if candidate already exists
+    const electionIsHappening = this.verifyElectionIsHappening(electionId)
+    assert(electionIsHappening, "Election has not started or has already been finished.")
+
+    const candidateAlreadyExists = this.verifyCandidateExistence(accountId, electionId)
+    assert(!candidateAlreadyExists, "Candidate already exists. Reverting call.")
+
     const candidate = new Candidate({ accountId, totalVotes: 0 })
     near.log("candidate =>", candidate)
 
