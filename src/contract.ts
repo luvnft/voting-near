@@ -83,14 +83,11 @@ class VotingNear {
     )
     this.elections.set(String(this.electionsCounterId), election)
     this.electionsCounterId += 1
-
   }
 
   @call({})
   add_candidate_to_election({ accountId, electionId }: { accountId: string, electionId: number }): void {
-    // TO-DO verify if is valid near account id => https://nomicon.io/DataStructures/Account#account-id-rules
     const electionToAddCandidate = this.elections.get(String(electionId))
-    near.log("electionToAddCandidate", electionToAddCandidate)
     const electionExists = this.verifyElectionExistence(electionId)
     assert(electionExists, "Election not found.")
 
@@ -101,14 +98,11 @@ class VotingNear {
     assert(!candidateAlreadyExists, "Candidate already exists. Reverting call.")
 
     const candidate = new Candidate({ accountId, totalVotes: 0 })
-    near.log("candidate =>", candidate)
 
-    near.log("electionToAddCandidate.candidates =>", electionToAddCandidate.candidates)
     electionToAddCandidate.candidates.push(candidate)
     this.elections.set(String(electionId), electionToAddCandidate)
 
     const currentElectionCandidates = this.candidates.get(String(electionId))
-    near.log("currentElectionCandidates =>", currentElectionCandidates)
 
     if (currentElectionCandidates === null) {
       this.candidates.set(String(electionId), [candidate])
@@ -121,14 +115,12 @@ class VotingNear {
   @call({})
   vote({ electionId, candidateId }: { electionId: number, candidateId: string }): void {
     const election = this.elections.get(String(electionId))
-    near.log("election", election)
     assert(election !== null, "Election not found.")
 
     const electionIsHappening = this.verifyElectionIsHappening(electionId)
     assert(electionIsHappening, "Election has not started or has already been finished.")
 
     const alreadyVoted = election.voters.includes(near.signerAccountId())
-    near.log("election.voters", election.voters)
 
     near.log("alreadyVoted", alreadyVoted)
     assert(!alreadyVoted, "User has already voted. Reverting call.")
@@ -139,8 +131,7 @@ class VotingNear {
       return candidateFilter.accountId === candidateId
     })[0]
 
-    const candidateExists = this.verifyCandidateExistence(candidate.accountId, electionId)
-    assert(candidateExists, "Candidate not found. Reverting call.")
+    assert(typeof candidate !== 'undefined', "Candidate not found. Reverting call.")
 
     const voter = new Voter({ accountId: near.signerAccountId(), votedCandidateAccountId: candidate.accountId, votedAt: near.blockTimestamp() })
 
@@ -166,16 +157,13 @@ class VotingNear {
 
   verifyElectionExistence(electionId: number): boolean {
     const election = this.elections.get(String(electionId))
-    near.log("election", election)
     const exists = election !== null
-    near.log("exists", exists)
 
     return exists
   }
 
   verifyElectionIsHappening(electionId: number): boolean {
     const election = this.elections.get(String(electionId))
-    near.log("election", election)
 
     const now = near.blockTimestamp()
     near.log("now", now)
@@ -188,18 +176,18 @@ class VotingNear {
 
   verifyCandidateExistence(candidateId: string, electionId: number): boolean {
     const candidates = this.candidates.get(String(electionId))
-    near.log("candidates", candidates)
 
-    const candidate = candidates.filter((candidateFilter) => {
-      return candidateFilter.accountId === candidateId
-    })
-    near.log("candidate", candidate)
-
-    
-    const exists = candidate.length > 0
-    near.log("exists", exists)
-
-    return exists
+    if (candidates === null) {
+      return false
+    } else {
+      const candidate = candidates.filter((candidateFilter) => {
+        return candidateFilter.accountId === candidateId
+      })
+      
+      const exists = candidate.length > 0
+  
+      return exists
+    }
   }
 }
 

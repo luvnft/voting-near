@@ -900,7 +900,7 @@ class Voter {
   }
 }
 
-var _dec, _dec2, _dec3, _dec4, _dec5, _dec6, _dec7, _dec8, _class, _class2;
+var _dec, _dec2, _dec3, _dec4, _dec5, _dec6, _dec7, _dec8, _dec9, _class, _class2;
 
 /*
 ============= REQUIREMENTS =============
@@ -921,8 +921,12 @@ var _dec, _dec2, _dec3, _dec4, _dec5, _dec6, _dec7, _dec8, _class, _class2;
     - Get number of votes in election
     - Get number of votes by candidate
     - Get percentage competition between candidates
+
+  **IDEAS
+      near deploy --accountId your-account-id --wasmFile out/main.wasm --initFunction init --initArgs '{"admins": [""]}'
+    - Only admnins can add candidate
 */
-let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), _dec4 = view(), _dec5 = view(), _dec6 = call({}), _dec7 = call({}), _dec8 = call({}), _dec(_class = (_class2 = class VotingNear {
+let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), _dec4 = view(), _dec5 = view(), _dec6 = view(), _dec7 = call({}), _dec8 = call({}), _dec9 = call({}), _dec(_class = (_class2 = class VotingNear {
   admins = [];
   electionsCounterId = 0;
   elections = new UnorderedMap("elections");
@@ -950,6 +954,16 @@ let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), 
   }) {
     return this.voters.get(String(electionId));
   }
+  get_voters_by_election_and_candidate({
+    electionId,
+    candidateId
+  }) {
+    const allVoters = this.voters.get(String(electionId));
+    const specificCandidateVoters = allVoters.filter(voter => {
+      return voter.votedCandidateAccountId === candidateId;
+    });
+    return specificCandidateVoters;
+  }
   create_election({
     endsAt,
     name,
@@ -958,7 +972,9 @@ let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), 
     const election = new Election({
       id: this.electionsCounterId,
       startsAt: BigInt(Number(startsAt) * 10 ** 6),
+      //Converting javascript milliseconds to near blockchain standard nanoseconds
       endsAt: BigInt(Number(endsAt) * 10 ** 6),
+      //Converting javascript milliseconds to near blockchain standard nanoseconds
       name,
       candidates: [],
       voters: [],
@@ -971,11 +987,12 @@ let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), 
     accountId,
     electionId
   }) {
-    // TO-DO verify if is valid near account id
+    // TO-DO verify if is valid near account id => https://nomicon.io/DataStructures/Account#account-id-rules
     const electionToAddCandidate = this.elections.get(String(electionId));
-    // TO-DO Verify if election exist
-
-    // TO-DO Verify if candidate already exists
+    const electionExists = this.verifyElectionExistence(electionId);
+    assert(electionExists, "Election not found.");
+    const candidateAlreadyExists = this.verifyCandidateExistence(accountId, electionId);
+    assert(!candidateAlreadyExists, "Candidate already exists. Reverting call.");
     const candidate = new Candidate({
       accountId,
       totalVotes: 0
@@ -998,10 +1015,9 @@ let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), 
     candidateId
   }) {
     const election = this.elections.get(String(electionId));
-    // TO-DO Verify if election exists
-    // TO-DO Verify if election has started
-    // TO-DO Verify if election has already ended
-
+    assert(election !== null, "Election not found.");
+    const electionIsHappening = this.verifyElectionIsHappening(electionId);
+    assert(electionIsHappening, "Election has not started or has already been finished.");
     const alreadyVoted = election.voters.includes(signerAccountId());
     log("election.voters", election.voters);
     log("alreadyVoted", alreadyVoted);
@@ -1010,19 +1026,15 @@ let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), 
     const candidate = candidates.filter(candidateFilter => {
       return candidateFilter.accountId === candidateId;
     })[0];
-
-    // TO-DO Verify if candidate exists
-
+    log("Passed candidate");
+    log("candidate", candidate);
+    const candidateExists = this.verifyCandidateExistence(candidate.accountId, electionId);
+    assert(candidateExists, "Candidate not found. Reverting call.");
     const voter = new Voter({
       accountId: signerAccountId(),
       votedCandidateAccountId: candidate.accountId,
       votedAt: blockTimestamp()
     });
-
-    // TO-DO Verify why election voters are not being updated
-    // TO-DO Verify why election totalVotes are not being updated
-    // TO-DO Verify why election candidates totalVotes are not being updated
-
     election.voters.push(voter.accountId);
     election.totalVotes += 1;
     election.candidates.filter(candidateFilter => {
@@ -1039,7 +1051,36 @@ let VotingNear = (_dec = NearBindgen({}), _dec2 = initialize(), _dec3 = view(), 
       this.voters.set(String(electionId), voters);
     }
   }
-}, (_applyDecoratedDescriptor(_class2.prototype, "init", [_dec2], Object.getOwnPropertyDescriptor(_class2.prototype, "init"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_election", [_dec3], Object.getOwnPropertyDescriptor(_class2.prototype, "get_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_candidates_by_election", [_dec4], Object.getOwnPropertyDescriptor(_class2.prototype, "get_candidates_by_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_voters_by_election", [_dec5], Object.getOwnPropertyDescriptor(_class2.prototype, "get_voters_by_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "create_election", [_dec6], Object.getOwnPropertyDescriptor(_class2.prototype, "create_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "add_candidate_to_election", [_dec7], Object.getOwnPropertyDescriptor(_class2.prototype, "add_candidate_to_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "vote", [_dec8], Object.getOwnPropertyDescriptor(_class2.prototype, "vote"), _class2.prototype)), _class2)) || _class);
+  verifyElectionExistence(electionId) {
+    const election = this.elections.get(String(electionId));
+    const exists = election !== null;
+    log("exists", exists);
+    return exists;
+  }
+  verifyElectionIsHappening(electionId) {
+    const election = this.elections.get(String(electionId));
+    const now = blockTimestamp();
+    log("now", now);
+    const isHappening = election.startsAt < now && election.endsAt > now;
+    log("isHappening", isHappening);
+    return isHappening;
+  }
+  verifyCandidateExistence(candidateId, electionId) {
+    const candidates = this.candidates.get(String(electionId));
+    log("candidates", candidates);
+    if (candidates === null) {
+      return false;
+    } else {
+      const candidate = candidates.filter(candidateFilter => {
+        return candidateFilter.accountId === candidateId;
+      });
+      log("candidate", candidate);
+      const exists = candidate.length > 0;
+      log("exists", exists);
+      return exists;
+    }
+  }
+}, (_applyDecoratedDescriptor(_class2.prototype, "init", [_dec2], Object.getOwnPropertyDescriptor(_class2.prototype, "init"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_election", [_dec3], Object.getOwnPropertyDescriptor(_class2.prototype, "get_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_candidates_by_election", [_dec4], Object.getOwnPropertyDescriptor(_class2.prototype, "get_candidates_by_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_voters_by_election", [_dec5], Object.getOwnPropertyDescriptor(_class2.prototype, "get_voters_by_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get_voters_by_election_and_candidate", [_dec6], Object.getOwnPropertyDescriptor(_class2.prototype, "get_voters_by_election_and_candidate"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "create_election", [_dec7], Object.getOwnPropertyDescriptor(_class2.prototype, "create_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "add_candidate_to_election", [_dec8], Object.getOwnPropertyDescriptor(_class2.prototype, "add_candidate_to_election"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "vote", [_dec9], Object.getOwnPropertyDescriptor(_class2.prototype, "vote"), _class2.prototype)), _class2)) || _class);
 function vote() {
   const _state = VotingNear._getState();
   if (!_state && VotingNear._requireInit()) {
@@ -1080,6 +1121,19 @@ function create_election() {
   const _args = VotingNear._getArgs();
   const _result = _contract.create_election(_args);
   VotingNear._saveToStorage(_contract);
+  if (_result !== undefined) if (_result && _result.constructor && _result.constructor.name === "NearPromise") _result.onReturn();else env.value_return(VotingNear._serialize(_result, true));
+}
+function get_voters_by_election_and_candidate() {
+  const _state = VotingNear._getState();
+  if (!_state && VotingNear._requireInit()) {
+    throw new Error("Contract must be initialized");
+  }
+  const _contract = VotingNear._create();
+  if (_state) {
+    VotingNear._reconstruct(_contract, _state);
+  }
+  const _args = VotingNear._getArgs();
+  const _result = _contract.get_voters_by_election_and_candidate(_args);
   if (_result !== undefined) if (_result && _result.constructor && _result.constructor.name === "NearPromise") _result.onReturn();else env.value_return(VotingNear._serialize(_result, true));
 }
 function get_voters_by_election() {
@@ -1133,5 +1187,5 @@ function init() {
   if (_result !== undefined) if (_result && _result.constructor && _result.constructor.name === "NearPromise") _result.onReturn();else env.value_return(VotingNear._serialize(_result, true));
 }
 
-export { add_candidate_to_election, create_election, get_candidates_by_election, get_election, get_voters_by_election, init, vote };
+export { add_candidate_to_election, create_election, get_candidates_by_election, get_election, get_voters_by_election, get_voters_by_election_and_candidate, init, vote };
 //# sourceMappingURL=voting_near.js.map
