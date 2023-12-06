@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "(MIT AND Apache-2.0)",
   "engines": {
-    "node": "20.x"
+    "node": "18.x"
   },
   "type": "module",
   "scripts": {
